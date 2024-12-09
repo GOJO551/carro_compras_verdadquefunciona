@@ -2,6 +2,8 @@ package filter;
 
 import jakarta.servlet.*;
 import jakarta.servlet.annotation.WebFilter;
+import jakarta.servlet.http.HttpServletResponse;
+import service.ServiceJdbcException;
 import utils.Conexion;
 
 import java.io.IOException;
@@ -23,7 +25,7 @@ public class ConexionFilter implements Filter {
     * Los filtros interceptán solicitudes y respuestas
     * de manera dinámica para transformaformarlos
     * o utilizar la información qeu contiene. El filtro
-    * se realiza en el método doFilter*/
+    * se realiza en el metodo doFilter*/
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
@@ -31,7 +33,7 @@ public class ConexionFilter implements Filter {
         * request: peticiones del cliente al servidor
         * response: respuesta del servidor
         * filterchain: Es una clase filtro que representa el flujo
-        * de procesamiento llamando al método chain.doFilter(request
+        * de procesamiento llamando al metodo chain.doFilter(request
         * response), dentro de un filtro pasa la solicitud
         * al siguiente filtro o al recurso destino(servlet o un jsp)*/
         try(Connection conn = Conexion.getConnection()){
@@ -56,13 +58,17 @@ public class ConexionFilter implements Filter {
                 conn.commit();
                 //Si ocurre alguna excepción se lanza dicha excepción
                 //y no se cambia la base de datos
-            }catch(SQLException e){
+            }catch(SQLException | ServiceJdbcException e){
                 //Se deshacen los cambios con rollback y de esa forma se mantien
                 //la integridad de los datos
                 conn.rollback();
+                //Si se envia un codigo de error que envie al cliente HTTP 500
+                //indicando un problema interno del servidor
+                ((HttpServletResponse)response).sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,e.getMessage());
+                e.printStackTrace();
             }
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
         }
     }
 }
